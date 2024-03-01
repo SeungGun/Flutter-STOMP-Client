@@ -1,4 +1,9 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:stomp_dart_client/stomp.dart';
+import 'package:stomp_dart_client/stomp_config.dart';
+import 'package:stomp_dart_client/stomp_frame.dart';
 
 void main() {
   runApp(const MyApp());
@@ -7,39 +12,20 @@ void main() {
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Flutter Demo',
       theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // Try running your application with "flutter run". You'll see the
-        // application has a blue toolbar. Then, without quitting the app, try
-        // changing the primarySwatch below to Colors.green and then invoke
-        // "hot reload" (press "r" in the console where you ran "flutter run",
-        // or simply save your changes to "hot reload" in a Flutter IDE).
-        // Notice that the counter didn't reset back to zero; the application
-        // is not restarted.
         primarySwatch: Colors.blue,
       ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+      home: const MyHomePage(title: 'Flutter STOMP-Client Demo'),
     );
   }
 }
 
 class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key, required this.title});
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
 
   final String title;
 
@@ -48,65 +34,83 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+  StompClient? stompClient;
+  String content = "";
+  String host = ""; // 서버 Host
+  List<Map<String, dynamic>> chats = [];
 
-  void _incrementCounter() {
-    setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
-    });
+  init() {
+    stompClient = StompClient(
+        config: StompConfig(
+      url: "ws://$host:8080/chat", // 소켓 연결 URL (에뮬레이터 테스트 시 localhost 사용 불가능)
+      onConnect: (StompFrame frame) { // STOMP 연결 콜백
+        print("Connection Command: ${frame.command}");
+
+        stompClient?.subscribe( // 클라이언트가 소켓 구독
+            destination: "/exchange/chat.exchange/*.room.1", // 대상 경로
+            callback: (frame) { // 수신 받은 frame(데이터)
+              print("Payload: ${frame.body}");
+              var json = jsonDecode(frame.body!); // json decode
+              setState(() {
+                content = json["content"];
+                chats.add(json);
+              });
+            });
+      },
+      beforeConnect: () async {
+        print("연결 중입니다.");
+      },
+      onWebSocketError: (error) => print(error.toString()),
+      onWebSocketDone: () {
+        print('연결됐음');
+      },
+    ));
+    stompClient?.activate(); // STOMP 연결 활성화
+  }
+
+  @override
+  void initState() {
+    init();
+    super.initState();
+  }
+
+void _sendMessage() {
+    Map<String, String> map = {"title": "me", "content": "안녕하세요."};
+    stompClient?.send(destination: "/pub/chat.talk.1", body: jsonEncode(map));
   }
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
+    final Size size = MediaQuery.of(context).size;
     return Scaffold(
       appBar: AppBar(
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
         title: Text(widget.title),
       ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Invoke "debug painting" (press "p" in the console, choose the
-          // "Toggle Debug Paint" action from the Flutter Inspector in Android
-          // Studio, or the "Toggle Debug Paint" command in Visual Studio Code)
-          // to see the wireframe for each widget.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Text(
-              'You have pushed the button this many times:',
-            ),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-          ],
-        ),
+      body: ListView.builder(
+        padding: EdgeInsets.all(size.width * 0.01),
+        itemBuilder: (context, index){
+          return Column(
+            children: [
+              Align(
+                alignment: chats[index]['title'] == "me" ? Alignment.centerRight : Alignment.centerLeft,
+                child: Container(
+                  child: Text(chats[index]['content']!),
+                  padding: EdgeInsets.all(size.width * 0.02),
+                  decoration: BoxDecoration(
+                    border: Border.all(width: 1),
+                    borderRadius: BorderRadius.circular(8),
+                    color: chats[index]['title'] == "me" ? Colors.grey[300] : Colors.orange[300]
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+        itemCount: chats.length,
+        // shrinkWrap: true,
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
+        onPressed: _sendMessage,
         tooltip: 'Increment',
         child: const Icon(Icons.add),
       ), // This trailing comma makes auto-formatting nicer for build methods.
