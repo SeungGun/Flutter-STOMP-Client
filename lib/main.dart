@@ -80,7 +80,7 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   void _sendMessage(String content) {
-    Map<String, String> map = {"title": "me", "content": content};
+    Map<String, String> map = {"sender": "me", "content": content};
     stompClient?.send(destination: "/pub/chat.talk.1", body: jsonEncode(map));
   }
 
@@ -100,7 +100,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 return Column(
                   children: [
                     Align(
-                      alignment: chats[index]['title'] == "me"
+                      alignment: chats[index]['sender'] == "me"
                           ? Alignment.centerRight
                           : Alignment.centerLeft,
                       child: Container(
@@ -109,7 +109,7 @@ class _MyHomePageState extends State<MyHomePage> {
                         decoration: BoxDecoration(
                             border: Border.all(width: 1),
                             borderRadius: BorderRadius.circular(8),
-                            color: chats[index]['title'] == "me"
+                            color: chats[index]['sender'] == "me"
                                 ? Colors.grey[300]
                                 : Colors.orange[300]),
                       ),
@@ -140,11 +140,6 @@ class _MyHomePageState extends State<MyHomePage> {
           )
         ],
       ),
-      // floatingActionButton: FloatingActionButton(
-      //   onPressed: _sendMessage,
-      //   tooltip: 'Increment',
-      //   child: const Icon(Icons.add),
-      // ), // This trailing comma makes auto-formatting nicer for build methods.
     );
   }
 }
